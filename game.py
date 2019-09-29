@@ -5,7 +5,8 @@ from pygame.math import Vector2
 
 
 class Car:
-    def __init__(self, x, y, angle=0.0, length=4, max_steering=30, max_acceleration=5.0):
+    def __init__(self, x, y, angle=0.0, length=4, max_steering=75,
+                 max_acceleration=25.0):
         self.position = Vector2(x, y)
         self.velocity = Vector2(0.0, 0.0)
         self.angle = angle
@@ -13,7 +14,7 @@ class Car:
         self.max_acceleration = max_acceleration
         self.max_steering = max_steering
         self.max_velocity = 20
-        self.brake_deceleration = 10
+        self.brake_deceleration = 30
         self.free_deceleration = 2
 
         self.acceleration = 0.0
@@ -22,6 +23,7 @@ class Car:
     def update(self, dt):
         self.velocity += (self.acceleration * dt, 0)
         self.velocity.x = max(-self.max_velocity, min(self.velocity.x, self.max_velocity))
+        #self.detectCollision()
 
         if self.steering:
             turning_radius = self.length / sin(radians(self.steering))
@@ -31,6 +33,13 @@ class Car:
 
         self.position += self.velocity.rotate(-self.angle) * dt
         self.angle += degrees(angular_velocity) * dt
+
+    def detectCollision(self):
+
+        if self.position.x > 30:
+            print( "Collision: True" )
+        else:
+            print( "Collision: False" )
 
 
 class Game:
@@ -66,12 +75,12 @@ class Game:
                 if car.velocity.x < 0:
                     car.acceleration = car.brake_deceleration
                 else:
-                    car.acceleration += 1 * dt
+                    car.acceleration += 8 * dt
             elif pressed[pygame.K_DOWN]:
                 if car.velocity.x > 0:
                     car.acceleration = -car.brake_deceleration
                 else:
-                    car.acceleration -= 1 * dt
+                    car.acceleration -= 8 * dt
             elif pressed[pygame.K_SPACE]:
                 if abs(car.velocity.x) > dt * car.brake_deceleration:
                     car.acceleration = -copysign(car.brake_deceleration, car.velocity.x)
@@ -86,9 +95,9 @@ class Game:
             car.acceleration = max(-car.max_acceleration, min(car.acceleration, car.max_acceleration))
 
             if pressed[pygame.K_RIGHT]:
-                car.steering -= 30 * dt
+                car.steering -= 300 * dt
             elif pressed[pygame.K_LEFT]:
-                car.steering += 30 * dt
+                car.steering += 300 * dt
             else:
                 car.steering = 0
             car.steering = max(-car.max_steering, min(car.steering, car.max_steering))
@@ -98,6 +107,8 @@ class Game:
 
             # Drawing
             self.screen.fill((0, 0, 0))
+            pygame.draw.rect(self.screen, (100,100,100), (10, 5, 200, 10))
+            self.draw_a_tree(150,(400,300))
             rotated = pygame.transform.rotate(car_image, car.angle)
             rect = rotated.get_rect()
             self.screen.blit(rotated, car.position * ppu - (rect.width / 2, rect.height / 2))
@@ -106,6 +117,18 @@ class Game:
             self.clock.tick(self.ticks)
         pygame.quit()
 
+    def draw_a_tree(self, leaf_size, tup, is_trunk=True):
+        x, y = tup
+        if is_trunk:
+            rect = pygame.rect.Rect((x - 25, y - 30), (50,60))
+            pygame.draw.rect(self.screen, (102,68,34), rect)
+            self.draw_a_tree(leaf_size, (x, y-30), False)
+        elif leaf_size <= 2:
+            return
+        else:
+            pygame.draw.polygon(self.screen, (0,200,0),((x-leaf_size/2,y),
+                                              (x+leaf_size/2,y),(x,y-(2*leaf_size/3))))
+            self.draw_a_tree(3*leaf_size/4, (x, y-leaf_size/3), False)
 
 if __name__ == '__main__':
     game = Game()
