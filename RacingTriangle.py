@@ -156,6 +156,56 @@ class Car(pg.sprite.Sprite):
 # TODO: Need to implement a Game class for a single track logic
 # TODO: Need to add inputs as
 
+
+
+class Game:
+    def __init__(self):
+        pg.init()
+        pg.display.set_caption("Car AI")
+        width = 1440
+        height = 800
+        self.screen = pg.display.set_mode((width, height))
+        self.clock = pg.time.Clock()
+        self.ticks = 60
+        self.exit = False
+
+        self.car_sprites = pg.sprite.Group()
+        self.boundary = TRACK
+
+        self.player = Car((300, 200), self.boundary)
+        self.car_sprites.add(self.player)
+
+    def run(self):
+        while not self.exit:
+            for event in pg.event.get():
+                if event.type == pg.QUIT:
+                    self.exit = True
+
+            keys = pg.key.get_pressed()
+            if keys[pg.K_w]:
+                self.player.speed += .2
+            elif keys[pg.K_s]:
+                self.player.speed -= .2
+
+            self.car_sprites.update()
+            self.screen.fill((30, 30, 30))
+            for side in self.boundary:
+                pg.draw.lines(self.screen, RED, False, side, 2)
+            # for line in player.sensors:
+            #    a, b = line
+            #    pg.draw.line(screen, DODGER_BLUE, a, b, 2)
+            for col in self.player.collisions:
+                # Unpack position, collision, and distance
+                p, c, d = col
+                pg.draw.circle(self.screen, DODGER_BLUE, c, 5, 2)
+                pg.draw.line(self.screen, DODGER_BLUE, p, c, 2)
+            self.car_sprites.draw(self.screen)
+
+            pg.display.flip()
+            self.clock.tick(30)
+        pg.quit()
+
+
 def main():
     screen = pg.display.set_mode((1440, 800))
     clock = pg.time.Clock()
@@ -196,12 +246,15 @@ def main():
 
         pg.display.flip()
         clock.tick(30)
-
-
-
+    pg.quit()
 
 if __name__ == '__main__':
-    pg.init()
-    main()
-    pg.quit()
+    game = Game()
+    game.run()
     sys.exit()
+
+#if __name__ == '__main__':
+#    pg.init()
+#    main()
+#    pg.quit()
+#    sys.exit()
