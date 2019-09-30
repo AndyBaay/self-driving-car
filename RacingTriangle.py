@@ -107,7 +107,10 @@ class Car(pg.sprite.Sprite):
 
 
     def rotate(self):
-        self.angle = (pg.mouse.get_pos()-self.pos).as_polar()[1]
+        # Mouse following example
+        #self.angle = (pg.mouse.get_pos()-self.pos).as_polar()[1]
+
+        # Keyboard example
         self.vel.from_polar((self.speed, self.angle))
         self.image = pg.transform.rotozoom(self.orig_img, -self.angle, 1)
         self.rect = self.image.get_rect(center=self.rect.center)
@@ -153,11 +156,7 @@ class Car(pg.sprite.Sprite):
 
         self.collisions = collisions
 
-# TODO: Need to implement a Game class for a single track logic
-# TODO: Need to add inputs as
-
-
-
+# TODO: Need to add inputs as arrow keys
 class Game:
     def __init__(self):
         pg.init()
@@ -171,6 +170,7 @@ class Game:
 
         self.car_sprites = pg.sprite.Group()
         self.boundary = TRACK
+        self.STEERING_SENSITIVITY=5
 
         self.player = Car((300, 200), self.boundary)
         self.car_sprites.add(self.player)
@@ -182,18 +182,20 @@ class Game:
                     self.exit = True
 
             keys = pg.key.get_pressed()
-            if keys[pg.K_w]:
+            if keys[pg.K_UP]:
                 self.player.speed += .2
-            elif keys[pg.K_s]:
+            elif keys[pg.K_DOWN]:
                 self.player.speed -= .2
+
+            if keys[pg.K_RIGHT]:
+                self.player.angle += self.STEERING_SENSITIVITY
+            elif keys[pg.K_LEFT]:
+                self.player.angle -= self.STEERING_SENSITIVITY
 
             self.car_sprites.update()
             self.screen.fill((30, 30, 30))
             for side in self.boundary:
                 pg.draw.lines(self.screen, RED, False, side, 2)
-            # for line in player.sensors:
-            #    a, b = line
-            #    pg.draw.line(screen, DODGER_BLUE, a, b, 2)
             for col in self.player.collisions:
                 # Unpack position, collision, and distance
                 p, c, d = col
@@ -211,10 +213,6 @@ def main():
     clock = pg.time.Clock()
     car_sprites = pg.sprite.Group()
     boundary = TRACK
-    #boundary = [[(100,100), (500,100)],
-    #            [(100,100), (100,500)],
-    #            [(200, 200), (500, 200)],
-    #            [(200,200), (200,500)]]
     player = Car((300, 200), boundary)
     car_sprites.add(player)
 
@@ -234,9 +232,6 @@ def main():
         screen.fill((30, 30, 30))
         for side in boundary:
             pg.draw.lines(screen, RED, False, side, 2)
-        #for line in player.sensors:
-        #    a, b = line
-        #    pg.draw.line(screen, DODGER_BLUE, a, b, 2)
         for col in player.collisions:
             # Unpack position, collision, and distance
             p, c, d = col
