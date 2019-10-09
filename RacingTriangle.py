@@ -227,7 +227,7 @@ class ScoreBoard(pg.sprite.Sprite):
         # Two members required for a Sprite to draw itself- image, rect
         # Image defines the look
         # Rect defines the boundaries
-        self.dimensions = (105, 75)
+        self.dimensions = (105, 103)
         self.image = pg.Surface(self.dimensions)
         self.rect = self.image.get_rect(center=pos)
         self.image.fill(WHITE)
@@ -236,13 +236,18 @@ class ScoreBoard(pg.sprite.Sprite):
                                        DODGER_BLUE)
         self.image.blit(self.header,(0,0))
         self.score = 0
+        self.distance = -1
 
-    def update(self, *args):
+    def update(self, new_dist = None):
         self.text = self.font.render("{0}".format(self.score),True,(0,0,0))
-
+        if new_dist is not None:
+            self.distance = new_dist
+        dist = self.font.render("%.0f" % self.distance,True,(0,0,0))
         self.image.fill(WHITE)
         self.image.blit(self.header,(0,0))
         self.image.blit(self.text,(0,40))
+        self.image.blit(dist,(0,75))
+
 
     def scoreInc(self, amount):
         self.score += amount
@@ -273,7 +278,7 @@ def find_square_conatining (squares, pos, checking_square = 0,
         squares_lookahead -= 1
     return found_square, None
 
-# TODO: Need to add inputs as arrow keys
+# TODO: Dying Logic: If Dist > 180, car dies
 class Game:
     def __init__(self):
         pg.init()
@@ -332,7 +337,7 @@ class Game:
 
             # Sprites
             self.car_sprites.update()
-            self.text_sprites.update()
+            self.text_sprites.update(d)
             self.screen.fill((30, 30, 30))
             for side in self.boundary:
                 pg.draw.lines(self.screen, RED, False, side, 2)
