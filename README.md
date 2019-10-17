@@ -1,2 +1,2 @@
-# pygame-car-tutorial
-The full tutorial is available here: http://rmgi.blog./pygame-2d-car-tutorial.html
+# self-driving-car
+Simple python project for introduction to AI and neural networks
