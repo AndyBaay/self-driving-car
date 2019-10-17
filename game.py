@@ -55,7 +55,7 @@ class Game:
 
     def run(self):
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        image_path = os.path.join(current_dir, "car.png")
+        image_path = os.path.join(current_dir, "world.png")
         car_image = pygame.image.load(image_path)
         car = Car(0, 0)
         ppu = 32

@@ -1,7 +1,7 @@
 import sys
 import pygame as pg
-import pyclipper
-
+from shapely.geometry import Polygon
+from functools import reduce
 
 class Player(pg.sprite.Sprite):
     def __init__(self, pos):
@@ -26,13 +26,31 @@ class Player(pg.sprite.Sprite):
         self.image = pg.transform.rotozoom(self.orig_img, -angle, 1)
         self.rect = self.image.get_rect(center=self.rect.center)
 
-def clip(subj, clip):
-    pc = pyclipper.Pyclipper()
-    pc.AddPath(clip, pyclipper.PT_CLIP, True)
-    pc.AddPaths(subj, pyclipper.PT_SUBJECT, True)
+def getCoords(polygon: Polygon):
+    return list(polygon.exterior.coords)
 
-    return pc.Execute(pyclipper.CT_INTERSECTION, pyclipper.PFT_EVENODD,
-                          pyclipper.PFT_EVENODD)
+def cliply(p1, p2):
+    print(p1)
+    print(p2)
+    print("p1: ", p1, "p2: ", p2)
+    a= Polygon(p1[0])
+    b= Polygon(p2)
+    intersection= a.intersection(b)
+    print("intersection: ", intersection)
+    if not intersection.is_empty:
+        polys = None
+        area = 0
+    if intersection.geom_type == 'MultiPolygon':
+        polys = list(intersection)
+        area = reduce(lambda x,y: x.area + y.area, polys)
+    elif intersection.geom_type == 'Polygon':
+        polys =[ intersection ]
+        area = intersection.area
+    print("Before: ", polys)
+    return_polys = list(map(getCoords, polys))
+    print("After: ", return_polys)
+    print("Area:", area)
+    return return_polys
 
 def main():
     pg.init()
@@ -46,12 +64,41 @@ def main():
     clock = pg.time.Clock()
     color = pg.Color('dodgerblue1')
 
-    #polys = []
-    polys = [(385, 256), (369, 295), (224, 308), (178, 502), (372, 637),
-              (751, 616), (1005, 594), (1169, 569), (1186, 521), (1130, 456),
-              (1029, 412), (990, 364), (1005, 309), (1102, 252), (1282, 144), (1306, 99), (1271, 72), (468, 134), (414, 173)]
-    pg.draw.lines(screen, color, True, polys)
+    polys = []
+    #polys = [(385, 256), (369, 295), (224, 308), (178, 502), (372, 637),
+    #          (751, 616), (1005, 594), (1169, 569), (1186, 521), (1130, 456),
+    #          (1029, 412), (990, 364), (1005, 309), (1102, 252), (1282,
+    #          144), (1306, 99), (1271, 72), (468, 134), (414, 173)]
+    track_outer = [(334, 215), (323, 237), (293, 248), (222, 255), (172, 270),
+     (120, 403), (81, 506), (321, 730), (1248, 640), (1286, 588),
+     (1274, 509), (1228, 459), (1179, 419), (1091, 377), (1063, 357),
+     (1063, 341), (1100, 311), (1195, 273), (1307, 206), (1376, 140),
+     (1379, 69), (1336, 23), (431, 79), (370, 114), (334, 215)]
+    ob_bottom=[ (81, 506), (321, 730), (1248, 640), (1286, 588),
+            (1274, 509), (1228, 459), (1179, 419), (1091, 377), (1063, 357),
+            (1437, 328), (1436, 797), (0, 796), (0, 264), (172, 270) ]
+    ob_top=[ (79, 505), (0, 505), (0, 0),(1438, 0),(1438, 505),
+            (1179, 419), (1091, 377), (1063, 357),
+            (1063, 341), (1100, 311), (1195, 273), (1307, 206), (1380, 140),
+           (1380, 69), (1336, 23), (431, 79), (370, 114), (334, 215),
+            (334, 215), (323, 237), (293, 248), (222, 255), (172, 270)]
+    # Top is less than 390, bottom is greater than 390
+    cutoff_point=390
+    detection_zone=[ob_top, ob_bottom]
+        #[ (79, 505), (1, 505), (1, 1),(1438, 1),(1438, 505),
+        #    (1179, 419), (1091, 377), (1063, 357),
+        #    (1063, 341), (1100, 311), (1195, 273), (1307, 206), (1376, 140),
+        #   (1379, 69), (1336, 23), (431, 79), (370, 114), (334, 215),
+        #    (334, 215), (323, 237), (293, 248), (222, 255), (172, 270)
+        #]
+    #detection_zone = [(79, 505), (0, 504), (0, 796), (1436, 797), (1437,
+    # 328), (1064, 343)]
 
+
+    #pg.draw.lines(screen, color, True, polys)
+    #pg.draw.lines(screen, color, True, track_outer)
+    for zone in detection_zone:
+        pg.draw.polygon(screen, (0,0,0), zone)
 
     points=[]
     first_pos=None
@@ -101,7 +148,7 @@ def main():
                 if first_pos is None:
                     print("Skipping")
                 else:
-                    s = clip(polys, points)[0]
+                    s = cliply(polys, points)[0]
                     over_points=[]
                     for x in s:
                         a, b = x
