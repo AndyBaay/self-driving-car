@@ -5,7 +5,7 @@ import matplotlib.path as mpltPath
 from selfdrivingcar.world.car import Car
 from selfdrivingcar.helpers.geometery import *
 from selfdrivingcar.world.track import *
-from selfdrivingcar.ai.driver import RandomDriver
+from selfdrivingcar.ai.driver import RandomDriver, HumanDriver
 
 ### GLOBALS ###
 DODGER_BLUE = pg.Color('dodgerblue1')
@@ -72,7 +72,7 @@ class Game:
         self.score = ScoreBoard((80,60))
         self.car_sprites.add(self.player)
         self.text_sprites.add(self.score)
-        self.driver = RandomDriver(self.player)
+        self.driver = HumanDriver(self.player)
 
         # Determine starting square:
         self.car_square, self.next_square= find_square_conatining(
@@ -137,41 +137,7 @@ class Game:
 
 
 def main():
-    screen = pg.display.set_mode((1440, 800))
-    clock = pg.time.Clock()
-    car_sprites = pg.sprite.Group()
-    boundary = TRACK
-    player = Car((300, 200), boundary)
-    car_sprites.add(player)
-
-    done = False
-    while not done:
-        for event in pg.event.get():
-            if event.type == pg.QUIT:
-                done = True
-
-        keys = pg.key.get_pressed()
-        if keys[pg.K_w]:
-            player.speed += .2
-        elif keys[pg.K_s]:
-            player.speed -= .2
-
-        car_sprites.update()
-        screen.fill((30, 30, 30))
-        for side in boundary:
-            pg.draw.lines(screen, RED, False, side, 2)
-        for gate in TRACK_GATES:
-            pg.draw.line(screen,GREEN, gate[0], gate[1], 3)
-        for col in player.collisions:
-            # Unpack position, collision, and distance
-            p, c, d = col
-            pg.draw.circle(screen, DODGER_BLUE, c, 5, 2)
-            pg.draw.line(screen, DODGER_BLUE, p, c, 2)
-        car_sprites.draw(screen)
-
-        pg.display.flip()
-        clock.tick(30)
-    pg.quit()
+    None
 
 if __name__ == '__main__':
     game = Game()
