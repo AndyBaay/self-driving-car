@@ -33,12 +33,14 @@ class RandomDriver():
         return self.output
 
 class NeatDriver():
-    def __init__(self, vehicle, genome, config):
+    def __init__(self, vehicle, network, genome):
         ## Initialize
         super().__init__()
         self.vehicle = vehicle
 
-        self.net = neat.nn.recurrent.RecurrentNetwork.create(genome, config)
+        self.net = network
+        self.genome = genome
+        self.max_idle = 250
 
         self.current_max_fitness = 0
         self.fitness_current = 0
@@ -54,16 +56,38 @@ class NeatDriver():
         self.counter = 0
         self.output = {pg.K_UP: False, pg.K_DOWN: False, pg.K_RIGHT: False, pg.K_LEFT: False }
 
-    def getMovement(self):
-        self.counter += 1
+    def getMovement(self, score):
+        self.fitness_current = score
+        if self.fitness_current > self.current_max_fitness:
+            self.current_max_fitness = self.fitness_current
+            self.counter = 0
+        else:
+            self.counter += 1
+        dead = self.counter > 250
+
+        self.genome.fitness = score
 
         # Feed the sensor data in
-        nnOutput = self.net.activate(self.vehicle.collisions)
+        input_data = self.vehicle.collisions.copy()
+        input_data.append(self.vehicle.dist_to_next_goal)
+        #print("input is ", input_data )
+        nnOutput = self.net.activate(input_data)
+        #print(nnOutput)
+        nn_key_press = self.updateKeys(nnOutput)
+        #print(nn_key_press)
 
         # Turn off the feedback loop for now
         # ob, rew, done, info = env.step(nnOutput)
-        #return ob
-        return pg.key.get_pressed()
+        #return our keystrokes and a boolean if we are stuck
+        return nn_key_press, dead
+        #return pg.key.get_pressed()
+
+    def updateKeys(self, choice_vector):
+        key_strokes = {}
+        for i in range(len(self.drive_options)):
+            # Binarize the output of the nn
+            key_strokes[self.drive_options[i]] = choice_vector[i] > 0.5
+        return key_strokes
 
 class HumanDriver:
     def __init__(self, vehicle):

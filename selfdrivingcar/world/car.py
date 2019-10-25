@@ -4,6 +4,7 @@ from ..helpers.geometery import *
 
 ## TODO: Refactor collision sensing to use pos and angle, not 2 positions
 ## TODO: Reduce redundant intersection calculations for sensors in opposite
+# TODO: Sensors need to be numbered and constantly reported
 # directions
 class Car(pg.sprite.Sprite):
     DODGER_BLUE = pg.Color('dodgerblue1')
@@ -36,10 +37,11 @@ class Car(pg.sprite.Sprite):
         self.track_walls = track_walls
 
         # Sensor variables
-        self.vision_length = 200
+        self.vision_length = 250
         self.sensor_angles = [-160, -130, -90, -50, -20, 0, 20, 50, 90, 130,
                               160, 180]
-        self.collisions = []
+        self.collisions = [self.vision_length for i in range(12)]
+        self.dist_to_next_goal = 250
 
         # Car state variables
         # Having some speed ensures that vector angle is updated (try setting
@@ -48,11 +50,12 @@ class Car(pg.sprite.Sprite):
         self.sensors = []
         self.angle = self.vel.as_polar()[1]
 
-    def update(self):
+    def update(self, next_goal):
         self.rotate()
         self.pos += self.vel
         self.rect.center = self.pos
         self.updateSensors()
+        self.update_goal_dist(next_goal)
         self.senseCollisions()
 
     def rotate(self):
@@ -60,6 +63,9 @@ class Car(pg.sprite.Sprite):
         self.vel.from_polar((self.speed, self.angle))
         self.image = pg.transform.rotozoom(self.orig_img, -self.angle, 1)
         self.rect = self.image.get_rect(center=self.rect.center)
+
+    def update_goal_dist(self, goal):
+        self.dist_to_next_goal = distToPolygon(goal, self.pos)
 
     def updateSensors(self):
         sens = [] # reset sensor array
@@ -89,7 +95,7 @@ class Car(pg.sprite.Sprite):
                     if c_point is not None: sensor_detections.append(c_point)
 
             # Now keep only the closest hit
-            min_dist = 100000
+            min_dist = self.vision_length
             closest_collision = None
             for col in sensor_detections:
                 d = pointDistance(col, self.pos)
@@ -97,7 +103,8 @@ class Car(pg.sprite.Sprite):
                     min_dist = d
                     closest_collision = col
             # Add closest hit to collisions to be drawn and reported back
-            if closest_collision is not None:
-                collisions.append((self.pos, closest_collision, min_dist))
+            #if closest_collision is not None:
+                #collisions.append((self.pos, closest_collision, min_dist))
+            collisions.append(min_dist)
 
         self.collisions = collisions

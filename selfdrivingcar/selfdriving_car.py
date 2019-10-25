@@ -1,11 +1,14 @@
 import sys
 import pygame as pg
 import matplotlib.path as mpltPath
+import neat
+import pickle
+
 
 from selfdrivingcar.world.car import Car
 from selfdrivingcar.helpers.geometery import *
 from selfdrivingcar.world.track import *
-from selfdrivingcar.ai.driver import RandomDriver, HumanDriver
+from selfdrivingcar.ai.driver import RandomDriver, HumanDriver, NeatDriver
 
 ### GLOBALS ###
 DODGER_BLUE = pg.Color('dodgerblue1')
@@ -29,6 +32,7 @@ class ScoreBoard(pg.sprite.Sprite):
                                        DODGER_BLUE)
         self.image.blit(self.header,(0,0))
         self.score = 0
+        self.idle_counter = 0
         self.distance = -1
         self.gameOver = False
 
@@ -41,17 +45,20 @@ class ScoreBoard(pg.sprite.Sprite):
         self.image.blit(self.header,(0,0))
         self.image.blit(self.text,(0,40))
         self.image.blit(dist,(0,75))
+        #self.idle_counter += 1
 
+        #if self.distance >= 200 or self.idle_counter > 400:
         if self.distance >= 200:
             self.gameOver = True
 
 
     def scoreInc(self, amount):
         self.score += amount
+        self.idle_counter = 0
 
 # TODO: Dying Logic: If Dist > 180, world dies
 class Game:
-    def __init__(self):
+    def __init__(self, network = None, genome = None):
         pg.init()
         pg.display.set_caption("Car AI")
         width = 1440
@@ -72,7 +79,9 @@ class Game:
         self.score = ScoreBoard((80,60))
         self.car_sprites.add(self.player)
         self.text_sprites.add(self.score)
-        self.driver = HumanDriver(self.player)
+        #self.driver = HumanDriver(self.player)
+        self.driver = NeatDriver(self.player, network, genome)
+        self.dead = False
 
         # Determine starting square:
         self.car_square, self.next_square= find_square_conatining(
@@ -83,13 +92,12 @@ class Game:
             for event in pg.event.get():
                 if event.type == pg.QUIT:
                     self.exit = True
-            if self.score.gameOver:
+            if self.score.gameOver or self.dead:
                 self.screen.fill((30, 30, 30))
                 self.text_sprites.draw(self.screen)
-                continue
-                #self.exit = True
+                self.exit = True
 
-            keys = self.driver.getMovement()
+            keys, self.dead = self.driver.getMovement(self.score.score)
             if keys[pg.K_UP]:
                 self.player.speed += .2
             elif keys[pg.K_DOWN]:
@@ -110,9 +118,9 @@ class Game:
                 self.next_square = n
             d = distToPolygon(self.track_squares[self.next_square],
                               self.player.pos)
-
+            next_goal=self.track_squares[self.next_square]
             # Sprites
-            self.car_sprites.update()
+            self.car_sprites.update(next_goal)
             self.text_sprites.update(d)
             self.screen.fill((30, 30, 30))
             for side in self.boundary:
@@ -123,23 +131,49 @@ class Game:
                             self.track_squares[self.next_square])
             for gate in TRACK_GATES:
                 pg.draw.line(self.screen, GREEN, gate[0], gate[1], 3)
-            for col in self.player.collisions:
+            #for col in self.player.collisions:
                 # Unpack position, collision, and distance
-                p, c, d = col
-                pg.draw.circle(self.screen, DODGER_BLUE, c, 5, 2)
-                pg.draw.line(self.screen, DODGER_BLUE, p, c, 2)
+                #p, c, d = col
+                #pg.draw.circle(self.screen, DODGER_BLUE, c, 5, 2)
+                #pg.draw.line(self.screen, DODGER_BLUE, p, c, 2)
             self.car_sprites.draw(self.screen)
             self.text_sprites.draw(self.screen)
 
             pg.display.flip()
             self.clock.tick(30)
+        #pg.display.quit()
         pg.quit()
 
 
+
+def eval_genomes(genomes, config):
+    #genome_id, genome = genomes[0]
+    for genome_id, genome in genomes:
+        net = neat.nn.recurrent.RecurrentNetwork.create(genome, config)
+        game = Game(net, genome)
+        game.run()
+        print("Finished: ", genome_id, genome.fitness)
+
 def main():
-    None
+    config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
+                         neat.DefaultSpeciesSet, neat.DefaultStagnation,
+                         'NEAT_Car.conf')
+
+    p = neat.Population(config)
+    print(p)
+    p.add_reporter(neat.StdOutReporter(True))
+    stats = neat.StatisticsReporter()
+    p.add_reporter(stats)
+    p.add_reporter(neat.Checkpointer(10))
+
+    winner = p.run(eval_genomes)
+    print(winner)
+    # pickel the output to store the network
+    with open('winner.pkl', 'wb') as output:
+        pickle.dump(winner, output, 1)
 
 if __name__ == '__main__':
-    game = Game()
-    game.run()
+    #game = Game()
+    #game.run()
+    main()
     sys.exit()
