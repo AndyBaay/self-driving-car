@@ -79,7 +79,7 @@ class NeatDriver():
         # Turn off the feedback loop for now
         # ob, rew, done, info = env.step(nnOutput)
         #return our keystrokes and a boolean if we are stuck
-        return nn_key_press, dead
+        return nn_key_press
         #return pg.key.get_pressed()
 
     def updateKeys(self, choice_vector):
@@ -95,5 +95,5 @@ class HumanDriver:
         super().__init__()
         self.vehicle = vehicle
 
-    def getMovement(self):
+    def getMovement(self, ignore):
         return pg.key.get_pressed()

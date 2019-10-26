@@ -1,6 +1,5 @@
 import sys
 import pygame as pg
-import matplotlib.path as mpltPath
 import neat
 import pickle
 
@@ -26,29 +25,25 @@ class ScoreBoard(pg.sprite.Sprite):
         self.dimensions = (105, 103)
         self.image = pg.Surface(self.dimensions)
         self.rect = self.image.get_rect(center=pos)
-        self.image.fill(WHITE)
-        self.font = pg.font.Font('freesansbold.ttf', 32)
-        self.header = self.font.render(' Score ', True, GREEN,
-                                       DODGER_BLUE)
-        self.image.blit(self.header,(0,0))
+
         self.score = 0
         self.idle_counter = 0
         self.distance = -1
         self.gameOver = False
 
     def update(self, new_dist = None):
-        self.text = self.font.render("{0}".format(self.score),True,(0,0,0))
+        #self.text = self.font.render("{0}".format(self.score),True,(0,0,0))
         if new_dist is not None:
             self.distance = new_dist
-        dist = self.font.render("%.0f" % self.distance,True,(0,0,0))
+        #dist = self.font.render("%.0f" % self.distance,True,(0,0,0))
         self.image.fill(WHITE)
-        self.image.blit(self.header,(0,0))
-        self.image.blit(self.text,(0,40))
-        self.image.blit(dist,(0,75))
+        #self.image.blit(self.header,(0,0))
+        #self.image.blit(self.text,(0,40))
+        #self.image.blit(dist,(0,75))
         #self.idle_counter += 1
 
         #if self.distance >= 200 or self.idle_counter > 400:
-        if self.distance >= 200:
+        if self.distance >= 120:
             self.gameOver = True
 
 
@@ -70,89 +65,50 @@ class Game:
 
         self.car_sprites = pg.sprite.Group()
         self.text_sprites = pg.sprite.Group()
-        self.score_sprites = pg.sprite.Group()
-        self.boundary = TRACK
-        self.track_squares = create_incentive_squares(TRACK_GATES)
-        self.STEERING_SENSITIVITY=5
+        self.race_track = MonzoTrack(1440,880)
 
-        self.player = Car((946, 74), self.boundary)
+        self.cars = ["Renault_1", "Renault_2", "Renault_3", "Renault_4"]
+        self.player = Car("Renault_0", (946, 74), self.race_track)
         self.score = ScoreBoard((80,60))
         self.car_sprites.add(self.player)
-        self.text_sprites.add(self.score)
-        #self.driver = HumanDriver(self.player)
-        self.driver = NeatDriver(self.player, network, genome)
-        self.dead = False
+        self.text_sprites.add(self.race_track)
+        self.driver = HumanDriver(self.player)
+        #self.driver = NeatDriver(self.player, network, genome)
 
-        # Determine starting square:
-        self.car_square, self.next_square= find_square_conatining(
-            self.track_squares, self.player.pos)
+        for car_name in self.cars:
+            self.car_sprites.add(Car(car_name, (946, 74), self.race_track))
 
     def run(self):
         while not self.exit:
             for event in pg.event.get():
                 if event.type == pg.QUIT:
                     self.exit = True
-            if self.score.gameOver or self.dead:
-                self.screen.fill((30, 30, 30))
-                self.text_sprites.draw(self.screen)
-                self.exit = True
 
-            keys, self.dead = self.driver.getMovement(self.score.score)
-            if keys[pg.K_UP]:
-                self.player.speed += .2
-            elif keys[pg.K_DOWN]:
-                self.player.speed -= .2
+            keys = self.driver.getMovement(self.score.score)
 
-            if keys[pg.K_RIGHT]:
-                self.player.angle += self.STEERING_SENSITIVITY
-            elif keys[pg.K_LEFT]:
-                self.player.angle -= self.STEERING_SENSITIVITY
-
-            # Check if we made it to the next square
-            c, n = find_square_conatining(
-                self.track_squares, self.player.pos, self.car_square, 3)
-            if c is not None: self.car_square = c
-            if n is not None:
-                # We have moved forward on the track, +1 points
-                if n != self.next_square: self.score.scoreInc(1)
-                self.next_square = n
-            d = distToPolygon(self.track_squares[self.next_square],
-                              self.player.pos)
-            next_goal=self.track_squares[self.next_square]
-            # Sprites
-            self.car_sprites.update(next_goal)
-            self.text_sprites.update(d)
-            self.screen.fill((30, 30, 30))
-            for side in self.boundary:
-                pg.draw.lines(self.screen, RED, False, side, 2)
-            pg.draw.polygon(self.screen, GREEN,
-                            self.track_squares[self.car_square])
-            pg.draw.polygon(self.screen, RED,
-                            self.track_squares[self.next_square])
-            for gate in TRACK_GATES:
-                pg.draw.line(self.screen, GREEN, gate[0], gate[1], 3)
+            self.car_sprites.update(keys)
+            self.text_sprites.update()
             #for col in self.player.collisions:
                 # Unpack position, collision, and distance
                 #p, c, d = col
                 #pg.draw.circle(self.screen, DODGER_BLUE, c, 5, 2)
                 #pg.draw.line(self.screen, DODGER_BLUE, p, c, 2)
-            self.car_sprites.draw(self.screen)
             self.text_sprites.draw(self.screen)
+            self.car_sprites.draw(self.screen)
 
             pg.display.flip()
             self.clock.tick(30)
-        #pg.display.quit()
         pg.quit()
 
 
 
-def eval_genomes(genomes, config):
+#def eval_genomes(genomes, config):
     #genome_id, genome = genomes[0]
-    for genome_id, genome in genomes:
-        net = neat.nn.recurrent.RecurrentNetwork.create(genome, config)
-        game = Game(net, genome)
-        game.run()
-        print("Finished: ", genome_id, genome.fitness)
+    #for genome_id, genome in genomes:
+    #    net = neat.nn.recurrent.RecurrentNetwork.create(genome, config)
+    #    game = Game(net, genome)
+    #    game.run()
+    #    print("Finished: ", genome_id, genome.fitness)
 
 def main():
     config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
@@ -173,7 +129,7 @@ def main():
         pickle.dump(winner, output, 1)
 
 if __name__ == '__main__':
-    #game = Game()
-    #game.run()
-    main()
+    game = Game()
+    game.run()
+    #main()
     sys.exit()
