@@ -17,18 +17,9 @@ class MonzoTrack(pg.sprite.Sprite):
               (1274, 509), (1228, 459), (1179, 419), (1091, 377), (1063, 357),
               (1063, 341), (1100, 311), (1195, 273), (1307, 206), (1376, 140),
               (1379, 69), (1336, 23), (431, 79), (370, 114), (334, 215)]
-    BOUNDARIES=[
-            [ (81, 506), (321, 730), (1248, 640), (1286, 588),
-                (1274, 509), (1228, 459), (1179, 419), (1091, 377), (1063, 357),
-                (1437, 328), (1436, 797), (0, 796), (0, 264), (172, 270) ],
-            [ (79, 505), (1, 505), (1, 1),(1438, 1),(1438, 505),
-                (1179, 419), (1091, 377), (1063, 357),
-                (1063, 341), (1100, 311), (1195, 273), (1307, 206), (1376, 140),
-                (1379, 69), (1336, 23), (431, 79), (370, 114), (334, 215),
-                (334, 215), (323, 237), (293, 248), (222, 255), (172, 270)
-            ]
-        ]
-    # Out of bounds
+    TRACK_LIMITS = [TRACK_INNER, TRACK_OUTER]
+
+    # Out of bounds polys
     ob_bottom = [(81, 506), (321, 730), (1248, 640), (1286, 588),
                  (1274, 509), (1228, 459), (1179, 419), (1091, 377), (1063, 357),
                  (1437, 328), (1436, 797), (0, 796), (0, 264), (172, 270)]
@@ -41,8 +32,6 @@ class MonzoTrack(pg.sprite.Sprite):
     cutoff_point = 390
     detection_zone = [ob_top, ob_bottom, TRACK_INNER]
 
-
-    BOUNDARIES.append(TRACK_INNER)
     TRACK_GATES=[[(470, 146), (460, 75)],[(540, 141), (526, 64)],
                  [(603, 134), (595, 58)],[(663, 128), (654, 53)],
                  [(731, 123), (720, 54)],[(804, 117), (796, 42)],
@@ -69,7 +58,6 @@ class MonzoTrack(pg.sprite.Sprite):
                  [(432, 165), (368, 92)]
                  ]
     OTHER_GATES=[]
-    TRACK = [TRACK_INNER, TRACK_OUTER]
     TEST_TRACK = [[(100,500), (100,100), (500,100)],
                   [(200, 500), (200, 200), (500, 200)]]
     def __init__(self, width, height):
@@ -83,7 +71,8 @@ class MonzoTrack(pg.sprite.Sprite):
         self.image = pg.Surface(self.dimensions, pg.SRCALPHA)
         self.image.fill(self.TRACK_ASPHALT_COLOR)
         self.rect = self.image.get_rect()
-        self.track_squares = self.create_incentive_squares(self.TRACK_GATES)
+        self.track_squares = self.create_incentive_squares(
+            self.TRACK_GATES)
         self.squares_in_use = set()
 
 
@@ -97,7 +86,7 @@ class MonzoTrack(pg.sprite.Sprite):
         pg.draw.line(self.image, (255,255,255), (1064, 97),(1064, 28), 7)
         for ob in self.detection_zone:
             pg.draw.polygon(self.image, self.TRACK_OB_COLOR, ob)
-        for side in self.TRACK:
+        for side in self.TRACK_LIMITS:
             pg.draw.lines(self.image, self.TRACK_BOUNDRY_COLOR, False, side, 3)
 
         self.squares_in_use = set()
@@ -120,8 +109,15 @@ class MonzoTrack(pg.sprite.Sprite):
     def create_incentive_squares(self, lines):
         squares=[]
         for i in range(len(lines)):
-            reverse_list = lines[ (i + 1) % len(lines)]
+            side1 = lines[i].copy()
+            side2 = lines[ (i + 1) % len(lines)].copy()
+
+            # Because of the order the gates were drawn in, you need to flip
+            # the points of every other side to ensure the four points are in
+            # the correct order for square and not an 'X'
             if (i % 2 == 0):
-                reverse_list.reverse()
-            squares += [lines[i] + reverse_list]
+                side2.reverse()
+            else:
+                side1.reverse()
+            squares += [side1 + side2]
         return squares

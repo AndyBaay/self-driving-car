@@ -3,9 +3,7 @@ import pygame as pg
 import neat
 import pickle
 
-
 from selfdrivingcar.world.car import Car
-from selfdrivingcar.helpers.geometery import *
 from selfdrivingcar.world.track import *
 from selfdrivingcar.ai.driver import RandomDriver, HumanDriver, NeatDriver
 
@@ -15,6 +13,8 @@ RED = (220, 0, 0)
 GREEN = (60, 220, 20)
 WHITE = (255, 255, 255)
 
+# TODO Remove ScoreBoard or get font working that does not cause segmentation
+#  fault
 class ScoreBoard(pg.sprite.Sprite):
     def __init__(self, pos):
         ## Initialize
@@ -53,7 +53,7 @@ class ScoreBoard(pg.sprite.Sprite):
 
 # TODO: Dying Logic: If Dist > 180, world dies
 class Game:
-    def __init__(self, network = None, genome = None):
+    def __init__(self):
         pg.init()
         pg.display.set_caption("Car AI")
         width = 1440
@@ -63,22 +63,15 @@ class Game:
         self.ticks = 60
         self.exit = False
 
+        self.score = ScoreBoard((80,60))
+
         self.car_sprites = pg.sprite.Group()
+
         self.world_sprites = pg.sprite.Group()
         self.race_track = MonzoTrack(1440,880)
-
-        #self.cars = ["Renault_1", "Renault_2", "Renault_3", "Renault_4"]
-        #self.player = Car("Renault_0", (946, 74), self.race_track)
-        self.score = ScoreBoard((80,60))
-        #self.car_sprites.add(self.player)
         self.world_sprites.add(self.race_track)
-        #self.driver = HumanDriver(self.player)
-        #self.driver = NeatDriver(self.player, network, genome)
 
-        self.to_be_removed = []
-
-        #for car_name in self.cars:
-        #    self.car_sprites.add(Car(car_name, (946, 74), self.race_track))
+        self.cars_to_remove = []
 
     def add_car(self, car):
         self.car_sprites.add(car)
@@ -86,22 +79,19 @@ class Game:
     def run(self):
         while not self.exit:
             # Remove any dead sprites
-            for s in self.to_be_removed:
+            for s in self.cars_to_remove:
                 print(s.name, "scored", s.score)
                 self.car_sprites.remove(s)
-            self.to_be_removed = []
+            self.cars_to_remove = []
 
             self.check_game_over(pg.event.get())
-
-            #keys = self.driver.getMovement(self.score.score)
-            #self.car_sprites.update(keys)
 
             self.car_sprites.update()
             self.world_sprites.update()
 
             for sprite in self.car_sprites.sprites():
                 if not sprite.alive:
-                    self.to_be_removed.append(sprite)
+                    self.cars_to_remove.append(sprite)
             self.world_sprites.draw(self.screen)
             self.car_sprites.draw(self.screen)
 
@@ -123,17 +113,27 @@ class Game:
 
 def eval_genomes(genomes, config):
     game = Game()
-    genome_id, genome = genomes[0]
     for genome_id, genome in genomes:
-        c = Car("Renault_" + str(genome_id), (946, 74), game.race_track)
+        car = Car("Renault_" + str(genome_id), (946, 74), game.race_track)
         net = neat.nn.recurrent.RecurrentNetwork.create(genome, config)
-        driver= NeatDriver(net, genome)
-        c.add_driver(driver)
-        game.add_car(c)
+        driver = NeatDriver(car, net, genome)
+        car.add_driver(driver)
+        game.add_car(car)
     game.run()
-    #print("Renault_" + str(genome_id), "scored", genome.fitness)
+    print("Renault_" + str(genome_id), "scored", genome.fitness)
 
-def main():
+
+def main(test = False):
+
+    if test:
+        game = Game()
+        car = Car("Renault_Tester", (946, 74), game.race_track)
+        driver = HumanDriver(car)
+        car.add_driver(driver)
+        game.add_car(car)
+        game.run()
+        return
+
     config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
                          neat.DefaultSpeciesSet, neat.DefaultStagnation,
                          'NEAT_Car.conf')
@@ -151,12 +151,10 @@ def main():
 
     winner = p.run(eval_genomes)
     print(winner)
-    # pickel the output to store the network
     with open('winner.pkl', 'wb') as output:
         pickle.dump(winner, output, 1)
 
 if __name__ == '__main__':
-    #game = Game()
-    #game.run()
+    #main(test = True)
     main()
     sys.exit()
