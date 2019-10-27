@@ -3,6 +3,8 @@ from pygame.math import Vector2
 from ..helpers.geometery import *
 import os
 
+from ..ai.driver import *
+
 
 ## TODO: Refactor collision sensing to use pos and angle, not 2 positions
 ## TODO: Reduce redundant intersection calculations for sensors in opposite
@@ -12,6 +14,8 @@ class Car(pg.sprite.Sprite):
     RED = (220, 0, 0)
     GREEN = (60, 220, 20)
     STEERING_SENSITIVITY = 5
+    MAX_DIST_TO_GOAL = 200
+    MAX_IDLE = 250
     def __init__(self, name, pos, race_track):
         ## Initialize
         super().__init__()
@@ -54,9 +58,18 @@ class Car(pg.sprite.Sprite):
 
         # Game variables
         self.score = 0
+        self.last_scored_timer = 0
         self.alive = True
 
-    def update(self, keys_pressed):
+        # Driver
+        self.driver = HumanDriver(self)
+
+    def add_driver(self, new_driver):
+        self.driver = new_driver
+
+    def update(self):
+        self.last_scored_timer += 1
+        keys_pressed = self.driver.getMovement(self)
         self.move_car(keys_pressed)
         self.rotate()
         self.pos += self.vel
@@ -64,6 +77,8 @@ class Car(pg.sprite.Sprite):
         self.update_sensors()
         self.update_goal_dist()
         self.sense_collisions()
+        if self.last_scored_timer > self.MAX_IDLE:
+            self.alive = False
 
     def rotate(self):
         # Keyboard example
@@ -80,16 +95,20 @@ class Car(pg.sprite.Sprite):
             if n != self.next_zone:
                 self.score += 1
                 self.next_zone = n
-                print(self.name, " scores +1, current total: ", self.score)
+                self.last_scored_timer = 0 # RESET OUR COUNTER
+                #print(self.name, " scores +1, current total: ", self.score)
 
         self.dist_to_next_goal = distToPolygon(self.track_zones[self.next_zone],
                           self.pos)
         self.race_track.squares_in_use.add(self.next_zone)
+        if self.dist_to_next_goal > self.MAX_DIST_TO_GOAL:
+            self.alive = False
 
     def move_car(self, inputs):
         keys = inputs
         if keys[pg.K_UP]:
             self.speed += .2
+
         elif keys[pg.K_DOWN]:
             self.speed -= .2
 

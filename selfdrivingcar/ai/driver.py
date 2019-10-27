@@ -33,10 +33,9 @@ class RandomDriver():
         return self.output
 
 class NeatDriver():
-    def __init__(self, vehicle, network, genome):
+    def __init__(self, network, genome):
         ## Initialize
         super().__init__()
-        self.vehicle = vehicle
 
         self.net = network
         self.genome = genome
@@ -46,8 +45,6 @@ class NeatDriver():
         self.fitness_current = 0
         self.frame = 0
 
-        done = False
-
         ## Options ##
         ## Can press forward || backward || right || left
         self.drive_options = [ pg.K_UP, pg.K_DOWN, pg.K_RIGHT, pg.K_LEFT ]
@@ -56,20 +53,19 @@ class NeatDriver():
         self.counter = 0
         self.output = {pg.K_UP: False, pg.K_DOWN: False, pg.K_RIGHT: False, pg.K_LEFT: False }
 
-    def getMovement(self, score):
-        self.fitness_current = score
+    def getMovement(self, vehicle):
+        self.fitness_current = vehicle.score
         if self.fitness_current > self.current_max_fitness:
             self.current_max_fitness = self.fitness_current
             self.counter = 0
         else:
             self.counter += 1
-        dead = self.counter > 250
 
-        self.genome.fitness = score
+        self.genome.fitness = self.current_max_fitness
 
         # Feed the sensor data in
-        input_data = self.vehicle.collisions.copy()
-        input_data.append(self.vehicle.dist_to_next_goal)
+        input_data = vehicle.collisions.copy()
+        input_data.append(vehicle.dist_to_next_goal)
         #print("input is ", input_data )
         nnOutput = self.net.activate(input_data)
         #print(nnOutput)

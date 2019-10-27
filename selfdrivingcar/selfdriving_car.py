@@ -64,51 +64,74 @@ class Game:
         self.exit = False
 
         self.car_sprites = pg.sprite.Group()
-        self.text_sprites = pg.sprite.Group()
+        self.world_sprites = pg.sprite.Group()
         self.race_track = MonzoTrack(1440,880)
 
-        self.cars = ["Renault_1", "Renault_2", "Renault_3", "Renault_4"]
-        self.player = Car("Renault_0", (946, 74), self.race_track)
+        #self.cars = ["Renault_1", "Renault_2", "Renault_3", "Renault_4"]
+        #self.player = Car("Renault_0", (946, 74), self.race_track)
         self.score = ScoreBoard((80,60))
-        self.car_sprites.add(self.player)
-        self.text_sprites.add(self.race_track)
-        self.driver = HumanDriver(self.player)
+        #self.car_sprites.add(self.player)
+        self.world_sprites.add(self.race_track)
+        #self.driver = HumanDriver(self.player)
         #self.driver = NeatDriver(self.player, network, genome)
 
-        for car_name in self.cars:
-            self.car_sprites.add(Car(car_name, (946, 74), self.race_track))
+        self.to_be_removed = []
+
+        #for car_name in self.cars:
+        #    self.car_sprites.add(Car(car_name, (946, 74), self.race_track))
+
+    def add_car(self, car):
+        self.car_sprites.add(car)
 
     def run(self):
         while not self.exit:
-            for event in pg.event.get():
-                if event.type == pg.QUIT:
-                    self.exit = True
+            # Remove any dead sprites
+            for s in self.to_be_removed:
+                print(s.name, "scored", s.score)
+                self.car_sprites.remove(s)
+            self.to_be_removed = []
 
-            keys = self.driver.getMovement(self.score.score)
+            self.check_game_over(pg.event.get())
 
-            self.car_sprites.update(keys)
-            self.text_sprites.update()
-            #for col in self.player.collisions:
-                # Unpack position, collision, and distance
-                #p, c, d = col
-                #pg.draw.circle(self.screen, DODGER_BLUE, c, 5, 2)
-                #pg.draw.line(self.screen, DODGER_BLUE, p, c, 2)
-            self.text_sprites.draw(self.screen)
+            #keys = self.driver.getMovement(self.score.score)
+            #self.car_sprites.update(keys)
+
+            self.car_sprites.update()
+            self.world_sprites.update()
+
+            for sprite in self.car_sprites.sprites():
+                if not sprite.alive:
+                    self.to_be_removed.append(sprite)
+            self.world_sprites.draw(self.screen)
             self.car_sprites.draw(self.screen)
 
             pg.display.flip()
             self.clock.tick(30)
         pg.quit()
 
+    def check_game_over(self, events):
+        # Check if the player manually exited
+        for event in events:
+            if event.type == pg.QUIT:
+                self.exit = True
+
+        # Check if all the cars are dead
+        if len(self.car_sprites.sprites()) == 0 :
+            print("No sprites found")
+            self.exit = True
 
 
-#def eval_genomes(genomes, config):
-    #genome_id, genome = genomes[0]
-    #for genome_id, genome in genomes:
-    #    net = neat.nn.recurrent.RecurrentNetwork.create(genome, config)
-    #    game = Game(net, genome)
-    #    game.run()
-    #    print("Finished: ", genome_id, genome.fitness)
+def eval_genomes(genomes, config):
+    game = Game()
+    genome_id, genome = genomes[0]
+    for genome_id, genome in genomes:
+        c = Car("Renault_" + str(genome_id), (946, 74), game.race_track)
+        net = neat.nn.recurrent.RecurrentNetwork.create(genome, config)
+        driver= NeatDriver(net, genome)
+        c.add_driver(driver)
+        game.add_car(c)
+    game.run()
+    #print("Renault_" + str(genome_id), "scored", genome.fitness)
 
 def main():
     config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
@@ -116,11 +139,15 @@ def main():
                          'NEAT_Car.conf')
 
     p = neat.Population(config)
+    #p = neat.Checkpointer.restore_checkpoint(
+    #    "../states/first_success/neat-checkpoint-216")
+
     print(p)
     p.add_reporter(neat.StdOutReporter(True))
     stats = neat.StatisticsReporter()
     p.add_reporter(stats)
     p.add_reporter(neat.Checkpointer(10))
+
 
     winner = p.run(eval_genomes)
     print(winner)
@@ -129,7 +156,7 @@ def main():
         pickle.dump(winner, output, 1)
 
 if __name__ == '__main__':
-    game = Game()
-    game.run()
-    #main()
+    #game = Game()
+    #game.run()
+    main()
     sys.exit()
