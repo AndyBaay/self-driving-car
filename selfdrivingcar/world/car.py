@@ -1,69 +1,152 @@
+import os
 import pygame as pg
 from pygame.math import Vector2
 from ..helpers.geometery import *
+from ..ai.driver import *
 
-## TODO: Refactor collision sensing to use pos and angle, not 2 positions
-## TODO: Reduce redundant intersection calculations for sensors in opposite
-# directions
+
 class Car(pg.sprite.Sprite):
-    DODGER_BLUE = pg.Color('dodgerblue1')
+    """
+    A Car object for driving around the track
+    """
+
+    # Appearances
     RED = (220, 0, 0)
     GREEN = (60, 220, 20)
-    WHITE = (255, 255, 255)
-    def __init__(self, pos, track_walls):
-        ## Initialize
+
+    # Driving Parameters
+    STEERING_SENSITIVITY = 5
+    MAX_DIST_TO_GOAL = 200
+    MAX_IDLE = 200
+    MAX_OB_AREA=1600
+
+    def __init__(self, name, pos, race_track):
+        """
+        Initialize the object
+        :param name: The name of this car, as there can be many on the track
+        :param pos: starting (x, y) position of the car
+        :param race_track: Track object so our car can understand the world
+        :return: None
+        """
         super().__init__()
+        self.name = name
 
-        # Two members required for a Sprite to draw itself- image, rect
-        # Image defines the look
-        # Rect defines the boundaries
-        self.dimensions = (40,22)
-        self.image = pg.Surface(self.dimensions, pg.SRCALPHA)
-        self.image.fill(self.WHITE)
+        # Initialize the two members required for a Sprite to work- image & rect
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        image_path = os.path.join(current_dir, "../../assets/Renault_Racer.png")
+        self.image = pg.image.load(image_path)
         self.rect = self.image.get_rect(center=pos)
+        self.dimensions = self.image.get_rect().size
 
-        # Draw on our sprite surface to make it look like a triangle
-        pg.draw.polygon(self.image, self.DODGER_BLUE, ((1, 1),
-                        (self.dimensions[0] - 1, self.dimensions[1] / 2),
-                        (1, self.dimensions[1] - 1)))
+        # Store this for future reference because transformations in update()
+        # are destructive so the image will degrade over time
+        self.orig_img = self.image.copy()
 
-        # Store this so we know how to rotate relative to 0
-        self.orig_img = self.image
-
-        # Initialize
+        # Initialize location/velocity
         self.pos = pg.math.Vector2(pos)
         self.vel = pg.math.Vector2(0, 0)
-        self.track_walls = track_walls
-
-        # Sensor variables
-        self.vision_length = 200
-        self.sensor_angles = [-160, -130, -90, -50, -20, 0, 20, 50, 90, 130,
-                              160, 180]
-        self.collisions = []
-
-        # Car state variables
         # Having some speed ensures that vector angle is updated (try setting
         # it 0)
         self.speed = 0.0001
-        self.sensors = []
         self.angle = self.vel.as_polar()[1]
 
+        # Sensor variables
+        self.sensors = []
+        self.vision_length = 250
+        self.sensor_angles = [-160, -130, -90, -50, -20, 0, 20, 50, 90, 130,
+                              160, 180]
+        self.collisions = [self.vision_length for i in range(12)]
+        self.area_ob = 0
+
+        # Track variables
+        self.race_track = race_track
+        self.track_zones = self.race_track.track_squares
+        self.current_zone, self.next_zone = find_square_conatining(
+            self.track_zones, self.pos, 0)
+        self.dist_to_next_goal = self.vision_length
+
+        # Game variables
+        self.score = 0
+        self.last_scored_timer = 0
+        self.alive = True
+
+        # Driver
+        self.driver = HumanDriver(self)
+
+
+    def add_driver(self, new_driver):
+        """
+        Add or replace the driver of the car
+        """
+        self.driver = new_driver
+
     def update(self):
+        """
+        Update the car's position, sensors, and score for 1 frame iteration
+        """
+        self.move_car()
         self.rotate()
-        self.pos += self.vel
-        self.rect.center = self.pos
-        self.updateSensors()
-        self.senseCollisions()
+        self.update_sensors()
+        self.update_goal_dist()
+        self.sense_collisions()
+        self.detect_out_of_bounds()
+
 
     def rotate(self):
-        # Keyboard example
+        """
+        Make sure the car image corresponds to its velocity and orientation
+        """
         self.vel.from_polar((self.speed, self.angle))
         self.image = pg.transform.rotozoom(self.orig_img, -self.angle, 1)
         self.rect = self.image.get_rect(center=self.rect.center)
 
-    def updateSensors(self):
-        sens = [] # reset sensor array
 
+    def update_goal_dist(self):
+        """
+        The track is split into zones, determine which zone we are in
+        currently, the next one we need to get to, and the distance to it.
+        """
+        current_square, next_square = find_square_conatining(
+            self.track_zones, self.pos, self.current_zone, 3)
+        if current_square is not None: self.current_zone = current_square
+        if next_square is not None:
+            # We have moved forward on the track, +1 points
+            if next_square != self.next_zone:
+                self.score += 1
+                self.next_zone = next_square
+                self.last_scored_timer = 0
+            else:
+                self.last_scored_timer += 1
+
+        self.dist_to_next_goal = distToPolygon(self.track_zones[self.next_zone],
+                                               self.pos)
+        self.race_track.squares_in_use.add(self.next_zone)
+        if (self.dist_to_next_goal > self.MAX_DIST_TO_GOAL or
+                self.last_scored_timer > self.MAX_IDLE):
+            self.alive = False
+
+    def move_car(self):
+        """
+        Update the velocity angle based on inputs from the driver
+        """
+        keys = self.driver.get_movement()
+        if keys[pg.K_UP]:
+            self.speed += .2
+        elif keys[pg.K_DOWN]:
+            self.speed -= .2
+        if keys[pg.K_RIGHT]:
+            self.angle += self.STEERING_SENSITIVITY
+        elif keys[pg.K_LEFT]:
+            self.angle -= self.STEERING_SENSITIVITY
+        self.pos += self.vel
+        self.rect.center = self.pos
+
+
+    def update_sensors(self):
+        """
+        Update the sensor vectors now that the position of the car has changed
+        """
+        sens = [] # reset sensor array
         # For each angle offset, create a vector and store it
         for a in self.sensor_angles:
             # A zero vector
@@ -74,30 +157,39 @@ class Car(pg.sprite.Sprite):
             sens.append((self.pos, self.pos + vector))
         self.sensors = sens
 
-    def senseCollisions(self):
-        collisions = []
+
+    def sense_collisions(self):
+        """
+        Detect the nearest collision for each sensor in the array
+        """
+        collisions =[]
 
         # Take each sensor line one at a time
         for sensor in self.sensors:
             sensor_detections = []
             # Detect the intersection of this sensor with each of the track
             # boundaries
-            for fence in self.track_walls:
+            for fence in self.race_track.TRACK_LIMITS:
                 for i in range(len(fence) - 1):
                     wall = (fence[i], fence[i + 1])
-                    c_point = findIntersection(sensor, wall)
+                    c_point = find_intersection(sensor, wall)
                     if c_point is not None: sensor_detections.append(c_point)
 
             # Now keep only the closest hit
-            min_dist = 100000
-            closest_collision = None
+            min_dist = self.vision_length
             for col in sensor_detections:
-                d = pointDistance(col, self.pos)
+                d = point_distance(col, self.pos)
                 if d < min_dist:
                     min_dist = d
-                    closest_collision = col
-            # Add closest hit to collisions to be drawn and reported back
-            if closest_collision is not None:
-                collisions.append((self.pos, closest_collision, min_dist))
+            collisions.append(min_dist)
 
         self.collisions = collisions
+
+
+    def detect_out_of_bounds(self):
+        """
+        Determine if the car is completely off-track
+        """
+        self.area_ob = self.race_track.check_out_of_bounds(self.rect)
+        if self.area_ob > self.MAX_OB_AREA:
+            self.alive = False

@@ -1,11 +1,11 @@
 import sys
 import pygame as pg
-import matplotlib.path as mpltPath
+import neat
+import pickle
 
 from selfdrivingcar.world.car import Car
-from selfdrivingcar.helpers.geometery import *
 from selfdrivingcar.world.track import *
-from selfdrivingcar.ai.driver import RandomDriver
+from selfdrivingcar.ai.driver import RandomDriver, HumanDriver, NeatDriver
 
 ### GLOBALS ###
 DODGER_BLUE = pg.Color('dodgerblue1')
@@ -13,6 +13,8 @@ RED = (220, 0, 0)
 GREEN = (60, 220, 20)
 WHITE = (255, 255, 255)
 
+# TODO Remove ScoreBoard or get font working that does not cause segmentation
+#  fault
 class ScoreBoard(pg.sprite.Sprite):
     def __init__(self, pos):
         ## Initialize
@@ -23,31 +25,31 @@ class ScoreBoard(pg.sprite.Sprite):
         self.dimensions = (105, 103)
         self.image = pg.Surface(self.dimensions)
         self.rect = self.image.get_rect(center=pos)
-        self.image.fill(WHITE)
-        self.font = pg.font.Font('freesansbold.ttf', 32)
-        self.header = self.font.render(' Score ', True, GREEN,
-                                       DODGER_BLUE)
-        self.image.blit(self.header,(0,0))
+
         self.score = 0
+        self.idle_counter = 0
         self.distance = -1
         self.gameOver = False
 
     def update(self, new_dist = None):
-        self.text = self.font.render("{0}".format(self.score),True,(0,0,0))
+        #self.text = self.font.render("{0}".format(self.score),True,(0,0,0))
         if new_dist is not None:
             self.distance = new_dist
-        dist = self.font.render("%.0f" % self.distance,True,(0,0,0))
+        #dist = self.font.render("%.0f" % self.distance,True,(0,0,0))
         self.image.fill(WHITE)
-        self.image.blit(self.header,(0,0))
-        self.image.blit(self.text,(0,40))
-        self.image.blit(dist,(0,75))
+        #self.image.blit(self.header,(0,0))
+        #self.image.blit(self.text,(0,40))
+        #self.image.blit(dist,(0,75))
+        #self.idle_counter += 1
 
-        if self.distance >= 200:
+        #if self.distance >= 200 or self.idle_counter > 400:
+        if self.distance >= 120:
             self.gameOver = True
 
 
     def scoreInc(self, amount):
         self.score += amount
+        self.idle_counter = 0
 
 # TODO: Dying Logic: If Dist > 180, world dies
 class Game:
@@ -61,119 +63,98 @@ class Game:
         self.ticks = 60
         self.exit = False
 
-        self.car_sprites = pg.sprite.Group()
-        self.text_sprites = pg.sprite.Group()
-        self.score_sprites = pg.sprite.Group()
-        self.boundary = TRACK
-        self.track_squares = create_incentive_squares(TRACK_GATES)
-        self.STEERING_SENSITIVITY=5
-
-        self.player = Car((946, 74), self.boundary)
         self.score = ScoreBoard((80,60))
-        self.car_sprites.add(self.player)
-        self.text_sprites.add(self.score)
-        self.driver = RandomDriver(self.player)
 
-        # Determine starting square:
-        self.car_square, self.next_square= find_square_conatining(
-            self.track_squares, self.player.pos)
+        self.car_sprites = pg.sprite.Group()
+
+        self.world_sprites = pg.sprite.Group()
+        self.race_track = MonzoTrack(1440,880)
+        self.world_sprites.add(self.race_track)
+
+        self.cars_to_remove = []
+
+    def add_car(self, car):
+        self.car_sprites.add(car)
 
     def run(self):
         while not self.exit:
-            for event in pg.event.get():
-                if event.type == pg.QUIT:
-                    self.exit = True
-            if self.score.gameOver:
-                self.screen.fill((30, 30, 30))
-                self.text_sprites.draw(self.screen)
-                continue
-                #self.exit = True
+            # Remove any dead sprites
+            for s in self.cars_to_remove:
+                print(s.name, "scored", s.score)
+                self.car_sprites.remove(s)
+            self.cars_to_remove = []
 
-            keys = self.driver.getMovement()
-            if keys[pg.K_UP]:
-                self.player.speed += .2
-            elif keys[pg.K_DOWN]:
-                self.player.speed -= .2
+            self.check_game_over(pg.event.get())
 
-            if keys[pg.K_RIGHT]:
-                self.player.angle += self.STEERING_SENSITIVITY
-            elif keys[pg.K_LEFT]:
-                self.player.angle -= self.STEERING_SENSITIVITY
-
-            # Check if we made it to the next square
-            c, n = find_square_conatining(
-                self.track_squares, self.player.pos, self.car_square, 3)
-            if c is not None: self.car_square = c
-            if n is not None:
-                # We have moved forward on the track, +1 points
-                if n != self.next_square: self.score.scoreInc(1)
-                self.next_square = n
-            d = distToPolygon(self.track_squares[self.next_square],
-                              self.player.pos)
-
-            # Sprites
             self.car_sprites.update()
-            self.text_sprites.update(d)
-            self.screen.fill((30, 30, 30))
-            for side in self.boundary:
-                pg.draw.lines(self.screen, RED, False, side, 2)
-            pg.draw.polygon(self.screen, GREEN,
-                            self.track_squares[self.car_square])
-            pg.draw.polygon(self.screen, RED,
-                            self.track_squares[self.next_square])
-            for gate in TRACK_GATES:
-                pg.draw.line(self.screen, GREEN, gate[0], gate[1], 3)
-            for col in self.player.collisions:
-                # Unpack position, collision, and distance
-                p, c, d = col
-                pg.draw.circle(self.screen, DODGER_BLUE, c, 5, 2)
-                pg.draw.line(self.screen, DODGER_BLUE, p, c, 2)
+            self.world_sprites.update()
+
+            for sprite in self.car_sprites.sprites():
+                if not sprite.alive:
+                    self.cars_to_remove.append(sprite)
+            self.world_sprites.draw(self.screen)
             self.car_sprites.draw(self.screen)
-            self.text_sprites.draw(self.screen)
 
             pg.display.flip()
             self.clock.tick(30)
         pg.quit()
 
-
-def main():
-    screen = pg.display.set_mode((1440, 800))
-    clock = pg.time.Clock()
-    car_sprites = pg.sprite.Group()
-    boundary = TRACK
-    player = Car((300, 200), boundary)
-    car_sprites.add(player)
-
-    done = False
-    while not done:
-        for event in pg.event.get():
+    def check_game_over(self, events):
+        # Check if the player manually exited
+        for event in events:
             if event.type == pg.QUIT:
-                done = True
+                self.exit = True
 
-        keys = pg.key.get_pressed()
-        if keys[pg.K_w]:
-            player.speed += .2
-        elif keys[pg.K_s]:
-            player.speed -= .2
+        # Check if all the cars are dead
+        if len(self.car_sprites.sprites()) == 0 :
+            print("No sprites found")
+            self.exit = True
 
-        car_sprites.update()
-        screen.fill((30, 30, 30))
-        for side in boundary:
-            pg.draw.lines(screen, RED, False, side, 2)
-        for gate in TRACK_GATES:
-            pg.draw.line(screen,GREEN, gate[0], gate[1], 3)
-        for col in player.collisions:
-            # Unpack position, collision, and distance
-            p, c, d = col
-            pg.draw.circle(screen, DODGER_BLUE, c, 5, 2)
-            pg.draw.line(screen, DODGER_BLUE, p, c, 2)
-        car_sprites.draw(screen)
 
-        pg.display.flip()
-        clock.tick(30)
-    pg.quit()
+def eval_genomes(genomes, config):
+    game = Game()
+    for genome_id, genome in genomes:
+        car = Car("Renault_" + str(genome_id), (946, 74), game.race_track)
+        net = neat.nn.recurrent.RecurrentNetwork.create(genome, config)
+        driver = NeatDriver(car, net, genome)
+        car.add_driver(driver)
+        game.add_car(car)
+    game.run()
+    print("Renault_" + str(genome_id), "scored", genome.fitness)
+
+
+def main(test = False):
+
+    if test:
+        game = Game()
+        car = Car("Renault_Tester", (946, 74), game.race_track)
+        driver = HumanDriver(car)
+        car.add_driver(driver)
+        game.add_car(car)
+        game.run()
+        return
+
+    config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
+                         neat.DefaultSpeciesSet, neat.DefaultStagnation,
+                         'NEAT_Car.conf')
+
+    p = neat.Population(config)
+    #p = neat.Checkpointer.restore_checkpoint(
+    #    "../states/first_success/neat-checkpoint-216")
+
+    print(p)
+    p.add_reporter(neat.StdOutReporter(True))
+    stats = neat.StatisticsReporter()
+    p.add_reporter(stats)
+    p.add_reporter(neat.Checkpointer(10))
+
+
+    winner = p.run(eval_genomes)
+    print(winner)
+    with open('winner.pkl', 'wb') as output:
+        pickle.dump(winner, output, 1)
 
 if __name__ == '__main__':
-    game = Game()
-    game.run()
+    #main(test = True)
+    main()
     sys.exit()
