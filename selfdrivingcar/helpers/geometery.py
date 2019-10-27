@@ -68,14 +68,13 @@ def getCoords(polygon: Polygon):
     return list(polygon.exterior.coords)
 
 # Returns the overlaping polygon coordinates and total area of overlap
-def findOverlap(p1, p2):
-    a= Polygon(p1[0])
+def find_overlap(p1, p2):
+    a= Polygon(p1)
     b= Polygon(p2)
     intersection= a.intersection(b)
 
-    if not intersection.is_empty:
-        polys = None
-        return [], 0
+    polys = []
+    area = 0
     if intersection.geom_type == 'MultiPolygon':
         polys = list(intersection)
         area = reduce(lambda x,y: x.area + y.area, polys)

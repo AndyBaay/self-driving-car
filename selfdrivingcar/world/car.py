@@ -15,7 +15,8 @@ class Car(pg.sprite.Sprite):
     GREEN = (60, 220, 20)
     STEERING_SENSITIVITY = 5
     MAX_DIST_TO_GOAL = 200
-    MAX_IDLE = 250
+    MAX_IDLE = 200
+    MAX_OB_AREA=1600
     def __init__(self, name, pos, race_track):
         ## Initialize
         super().__init__()
@@ -48,6 +49,7 @@ class Car(pg.sprite.Sprite):
         self.sensor_angles = [-160, -130, -90, -50, -20, 0, 20, 50, 90, 130,
                               160, 180]
         self.collisions = [self.vision_length for i in range(12)]
+        self.area_ob = 0
 
         # Track variables
         self.race_track = race_track
@@ -77,7 +79,8 @@ class Car(pg.sprite.Sprite):
         self.update_sensors()
         self.update_goal_dist()
         self.sense_collisions()
-        if self.last_scored_timer > self.MAX_IDLE:
+        self.area_ob = self.race_track.check_out_of_bounds(self.rect)
+        if self.last_scored_timer > self.MAX_IDLE or self.area_ob > self.MAX_OB_AREA:
             self.alive = False
 
     def rotate(self):

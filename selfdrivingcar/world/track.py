@@ -1,5 +1,6 @@
 import pygame as pg
 import os
+from ..helpers.geometery import find_overlap
 
 class MonzoTrack(pg.sprite.Sprite):
     TRACK_BOUNDRY_COLOR = (220, 0, 0)
@@ -101,6 +102,18 @@ class MonzoTrack(pg.sprite.Sprite):
 
         self.squares_in_use = set()
 
+    def check_out_of_bounds(self, rect):
+        rect_coords = [rect.topleft,
+            rect.topright,
+            rect.bottomright,
+            rect.bottomleft]
+        polys = []
+        area = 0
+        for ob in self.detection_zone:
+            p, a = find_overlap(ob, rect_coords)
+            polys.append(p)
+            area += a
+        return area
 
 
     ## Used to make squares from the track boundaries ##
