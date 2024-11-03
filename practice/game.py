@@ -55,9 +55,11 @@ class Game:
 
     def run(self):
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        image_path = os.path.join(current_dir, "world.png")
+        print(current_dir)
+        image_path = os.path.join("/Users/andybaay/Developer/car-ai/pygame-car-tutorial", "assets/McLaren_Racer.png")
+        print(image_path)
         car_image = pygame.image.load(image_path)
-        car = Car(0, 0)
+        car = Car(10, 10)
         ppu = 32
 
         while not self.exit:
@@ -129,6 +131,12 @@ class Game:
             pygame.draw.polygon(self.screen, (0,200,0),((x-leaf_size/2,y),
                                               (x+leaf_size/2,y),(x,y-(2*leaf_size/3))))
             self.draw_a_tree(3*leaf_size/4, (x, y-leaf_size/3), False)
+
+    def draw_our_track(self):
+        COORDS = [(468, 99), (772, 104), (820, 111), (841, 121), (856, 141), (866, 164), (869, 186), (869, 212), (871, 227), (879, 232), (890, 233), (910, 235), (925, 236), (942, 242), (949, 254), (950, 266), (949, 278), (945, 296), (935, 308), (916, 312), (896, 312), (874, 311), (196, 210), (188, 196), (188, 173), (192, 157), (204, 133), (230, 118), (256, 108), (308, 100), (466, 102)]
+[(315, 134), (768, 137), (788, 139), (797, 145), (804, 152), (809, 159), (814, 169), (816, 181), (818, 192), (818, 205), (818, 219), (820, 232), (824, 242), (832, 249), (849, 260), (863, 265), (876, 269), (888, 271), (896, 271), (902, 273), (894, 276), (245, 177), (245, 165), (256, 156), (279, 145)]
+
+
 
 if __name__ == '__main__':
     game = Game()
